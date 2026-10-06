@@ -15,6 +15,7 @@ fn main() {
     log::info!("日志级别可通过 RUST_LOG 调整，如 RUST_LOG=voxvale=debug");
 
     gpui_kit::application()
+        .with_assets(gpui_kit::assets::Assets)
         .run(|cx| {
             gpui_kit::init(cx);
             log::debug!("gpui 初始化完成");
@@ -26,9 +27,12 @@ fn main() {
                             window_min_size: Some(gpui_kit::size(px(520.0), px(760.0))),
                             titlebar: Some(TitlebarOptions {
                                 title: Some("声谷 VoxVale".into()),
-                                ..Default::default()
+                                ..gpui_kit::component::TitleBar::title_bar_options()
                             }),
-                            ..Default::default()
+                            // 强制客户端装饰：GNOME Wayland 的服务端装饰默认只有关闭键，
+                            // 客户端模式让 TitleBar 自绘最小化/最大化/关闭
+                            window_decorations: Some(WindowDecorations::Client),
+                            ..gpui_kit::component::TitleBar::window_options()
                         },
                         |window, cx| {
                             let view = cx.new(|cx| ui::VoxValeView::new(window, cx));

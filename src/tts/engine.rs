@@ -184,11 +184,12 @@ impl TtsEngine {
                     text.chars().count(),
                     source.label()
                 );
-                let t = Instant::now();
+                let t_total = Instant::now();
                 let model = self.ensure_model(DESIGN_MODEL_ID, source, events)?;
                 if !model.is_voice_design_model() {
                     bail!("加载的模型不是 VoiceDesign 类型");
                 }
+                let t_gen = Instant::now();
                 let result = model.generate_voice_design_from_text(
                     &text,
                     &instruction,
@@ -197,9 +198,10 @@ impl TtsEngine {
                 )?;
                 let (samples, sample_rate) = finish(result)?;
                 log::info!(
-                    "音色设计合成完成：输出 {:.1}s，耗时 {:.1}s",
+                    "音色设计合成完成：输出 {:.1}s，纯合成 {:.1}s（含模型准备共 {:.1}s）",
                     samples.len() as f32 / sample_rate as f32,
-                    t.elapsed().as_secs_f32()
+                    t_gen.elapsed().as_secs_f32(),
+                    t_total.elapsed().as_secs_f32()
                 );
                 Ok((samples, sample_rate))
             }
@@ -222,7 +224,7 @@ impl TtsEngine {
                     ref_pcm.len(),
                     source.label()
                 );
-                let t = Instant::now();
+                let t_total = Instant::now();
                 let pcm24 = resample_linear(&ref_pcm, ref_sample_rate, TARGET_SAMPLE_RATE);
                 log::info!(
                     "参考音频重采样 {ref_sample_rate}Hz→{TARGET_SAMPLE_RATE}Hz：{}→{} 样本",
@@ -236,6 +238,7 @@ impl TtsEngine {
                 if !model_ref.is_base_model() {
                     bail!("加载的模型不是 Base 类型，无法克隆");
                 }
+                let t_gen = Instant::now();
                 let prompt = model_ref.create_voice_clone_prompt_from_audio(&tensor, None, true)?;
                 let result =
                     model_ref.generate_voice_clone_from_text(&text, &prompt, &language, None)?;
@@ -246,9 +249,10 @@ impl TtsEngine {
                     log::info!("WSOLA 变速 ×{speed:.2}：{before}→{} 样本", samples.len());
                 }
                 log::info!(
-                    "语音克隆合成完成：输出 {:.1}s，耗时 {:.1}s",
+                    "语音克隆合成完成：输出 {:.1}s，纯合成 {:.1}s（含模型准备共 {:.1}s）",
                     samples.len() as f32 / sample_rate as f32,
-                    t.elapsed().as_secs_f32()
+                    t_gen.elapsed().as_secs_f32(),
+                    t_total.elapsed().as_secs_f32()
                 );
                 Ok((samples, sample_rate))
             }

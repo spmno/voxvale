@@ -21,7 +21,7 @@ ureq = "2"
 
 [features]
 default = []
-# GPU 加速透传（官方后端；W7900/ROCm 社区实验已回退，wgpu 路线另行规划）
+# GPU 加速透传。CUDA 特性配合 ZLUDA 可在 AMD GPU 上运行（需运行时提供 libcuda 兼容层）
 cuda = ["qwen_tts/cuda"]
 metal = ["qwen_tts/metal"]
 
