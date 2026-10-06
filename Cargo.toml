@@ -1,0 +1,30 @@
+[package]
+name = "voxvale"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0.104"
+candle-core = "0.9"
+env_logger = "0.11.11"
+gpui-kit = "0.7"
+hound = "3.5.1"
+log = "0.4.34"
+openssl = { version = "0.10.81", features = ["vendored"] }
+qwen_tts = { version = "0.1", features = ["audio-loading"] }
+rfd = "0.17.2"
+rodio = "0.22.2"
+serde_json = "1"
+shine-rs = "0.1.5"
+symphonia = { version = "0.5.5", features = ["mp3", "wav", "flac", "ogg", "vorbis", "pcm"] }
+ureq = "2"
+
+[features]
+default = []
+# GPU 加速透传（本机 W7900/ROCm 暂不支持，candle 仅 CPU/CUDA/Metal）
+cuda = ["qwen_tts/cuda"]
+metal = ["qwen_tts/metal"]
+
+[profile.release]
+opt-level = 3
+lto = "thin"
