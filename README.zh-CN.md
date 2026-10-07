@@ -1,5 +1,7 @@
 # 声谷 VoxVale
 
+> [English](README.md) | **简体中文**
+
 本地优先的语音生成桌面应用 —— 描述声音、输入文本、导出 MP3。
 
 基于 GPUI + Candle 构建，Qwen3-TTS 模型**全程在本机推理，数据不出设备**。

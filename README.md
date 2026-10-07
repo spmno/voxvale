@@ -1,5 +1,7 @@
 # VoxVale
 
+> **English** | [简体中文](README.zh-CN.md)
+
 Local-first voice generation desktop app — describe a voice, input text, export MP3.
 
 Built on GPUI + Candle. Qwen3-TTS model runs **entirely on-device — your data never leaves your machine**.
