@@ -1,3 +1,4 @@
+use crate::i18n::Language;
 use std::fmt;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -11,38 +12,39 @@ pub enum Emotion {
     Serious,
 }
 
-pub const EMOTION_LABELS: [&str; 7] = [
-    "自然",
-    "温暖",
-    "欢快",
-    "平静",
-    "忧伤",
-    "激动",
-    "严肃",
-];
-
 impl Emotion {
-    pub fn from_label(label: &str) -> Self {
-        match label {
-            "温暖" => Self::Warm,
-            "欢快" => Self::Cheerful,
-            "平静" => Self::Calm,
-            "忧伤" => Self::Sad,
-            "激动" => Self::Excited,
-            "严肃" => Self::Serious,
-            _ => Self::Natural,
+    pub fn label(&self, lang: Language) -> &'static str {
+        match lang {
+            Language::English => match self {
+                Self::Natural => "Natural",
+                Self::Warm => "Warm",
+                Self::Cheerful => "Cheerful",
+                Self::Calm => "Calm",
+                Self::Sad => "Sad",
+                Self::Excited => "Excited",
+                Self::Serious => "Serious",
+            },
+            Language::Chinese => match self {
+                Self::Natural => "自然",
+                Self::Warm => "温暖",
+                Self::Cheerful => "欢快",
+                Self::Calm => "平静",
+                Self::Sad => "忧伤",
+                Self::Excited => "激动",
+                Self::Serious => "严肃",
+            },
         }
     }
 
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Natural => "自然",
-            Self::Warm => "温暖",
-            Self::Cheerful => "欢快",
-            Self::Calm => "平静",
-            Self::Sad => "忧伤",
-            Self::Excited => "激动",
-            Self::Serious => "严肃",
+    pub fn from_label(label: &str) -> Self {
+        match label {
+            "温暖" | "Warm" => Self::Warm,
+            "欢快" | "Cheerful" => Self::Cheerful,
+            "平静" | "Calm" => Self::Calm,
+            "忧伤" | "Sad" => Self::Sad,
+            "激动" | "Excited" => Self::Excited,
+            "严肃" | "Serious" => Self::Serious,
+            _ => Self::Natural,
         }
     }
 
@@ -61,7 +63,7 @@ impl Emotion {
 
 impl fmt::Display for Emotion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.label())
+        f.write_str(self.label(crate::i18n::get_language()))
     }
 }
 
@@ -72,13 +74,26 @@ pub enum PauseStyle {
     Less,
 }
 
-pub const PAUSE_LABELS: [&str; 3] = ["自然停顿", "多停顿", "少停顿"];
-
 impl PauseStyle {
+    pub fn label(&self, lang: Language) -> &'static str {
+        match lang {
+            Language::English => match self {
+                Self::Natural => "Natural",
+                Self::More => "More",
+                Self::Less => "Less",
+            },
+            Language::Chinese => match self {
+                Self::Natural => "自然停顿",
+                Self::More => "多停顿",
+                Self::Less => "少停顿",
+            },
+        }
+    }
+
     pub fn from_label(label: &str) -> Self {
         match label {
-            "多停顿" => Self::More,
-            "少停顿" => Self::Less,
+            "多停顿" | "More" => Self::More,
+            "少停顿" | "Less" => Self::Less,
             _ => Self::Natural,
         }
     }
@@ -215,5 +230,21 @@ mod tests {
         let inst = build_voice_instruction("知性女声", &params);
         assert!(inst.contains("情绪温暖柔和"));
         assert!(inst.contains("句间停顿稍长"));
+    }
+
+    #[test]
+    fn emotion_labels_bilingual() {
+        assert_eq!(Emotion::Natural.label(Language::English), "Natural");
+        assert_eq!(Emotion::Natural.label(Language::Chinese), "自然");
+        assert_eq!(Emotion::from_label("Natural"), Emotion::Natural);
+        assert_eq!(Emotion::from_label("自然"), Emotion::Natural);
+    }
+
+    #[test]
+    fn pause_labels_bilingual() {
+        assert_eq!(PauseStyle::More.label(Language::English), "More");
+        assert_eq!(PauseStyle::More.label(Language::Chinese), "多停顿");
+        assert_eq!(PauseStyle::from_label("More"), PauseStyle::More);
+        assert_eq!(PauseStyle::from_label("多停顿"), PauseStyle::More);
     }
 }

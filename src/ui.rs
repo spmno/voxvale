@@ -1,12 +1,12 @@
 use crate::audio::decode::decode_audio_file;
 use crate::audio::export::{export_mp3, mp3_default_name};
 use crate::audio::playback::AudioPreview;
+use crate::i18n::{Language, get_language, set_language, t};
 use crate::tts::engine::{
-    CLONE_MODEL_LABELS, SOURCE_LABELS, CloneModel, DownloadSource, EngineEvent, SynthRequest,
-    TtsMode, fmt_bytes, spawn_worker,
+    CloneModel, DownloadSource, EngineEvent, SynthRequest, TtsMode, fmt_bytes, spawn_worker,
 };
 use crate::tts::instruct::{
-    EMOTION_LABELS, Emotion, PAUSE_LABELS, PauseStyle, VoiceParams, build_voice_instruction,
+    Emotion, PauseStyle, VoiceParams, build_voice_instruction,
 };
 use gpui_kit::component::button::{Button, ButtonVariants};
 use gpui_kit::component::group_box::GroupBox;
@@ -28,27 +28,90 @@ const LANGUAGES: [&str; 3] = ["chinese", "auto", "english"];
 const SPEED_MIN: f32 = 0.7;
 const SPEED_MAX: f32 = 1.3;
 
-const VOICE_PRESETS: [(&str, &str); 4] = [
-    (
-        "温柔女童",
-        "6~8岁女童，声音清亮柔和，自然稚嫩，带有自然呼吸与气息声，无机械AI感，适合绘本故事朗读",
-    ),
-    (
-        "活泼男孩",
-        "7~9岁男孩，声音明亮有活力，吐字清晰，语速适中，自然生动，适合课文朗读",
-    ),
-    (
-        "知性女声",
-        "30岁左右女性，声音温润知性，吐字清晰，语速平稳，适合科普讲解与新闻播报",
-    ),
-    (
-        "沉稳男声",
-        "35岁左右男性，声音低沉沉稳，字正腔圆，从容大气，适合纪录片解说",
-    ),
-];
+fn voice_presets() -> [(&'static str, &'static str); 4] {
+    match get_language() {
+        Language::English => [
+            (
+                "Gentle Girl",
+                "6-8 year old girl, clear and soft voice, naturally childlike, with natural breathiness, no robotic AI feel, suitable for picture book narration",
+            ),
+            (
+                "Lively Boy",
+                "7-9 year old boy, bright and energetic voice, clear articulation, moderate pace, natural and vivid, suitable for textbook narration",
+            ),
+            (
+                "Intellectual Female",
+                "~30 year old female, warm and intellectual voice, clear articulation, steady pace, suitable for science explanation and news broadcasting",
+            ),
+            (
+                "Calm Male",
+                "~35 year old male, deep and calm voice, precise articulation, composed and grand, suitable for documentary narration",
+            ),
+        ],
+        Language::Chinese => [
+            (
+                "温柔女童",
+                "6~8岁女童，声音清亮柔和，自然稚嫩，带有自然呼吸与气息声，无机械AI感，适合绘本故事朗读",
+            ),
+            (
+                "活泼男孩",
+                "7~9岁男孩，声音明亮有活力，吐字清晰，语速适中，自然生动，适合课文朗读",
+            ),
+            (
+                "知性女声",
+                "30岁左右女性，声音温润知性，吐字清晰，语速平稳，适合科普讲解与新闻播报",
+            ),
+            (
+                "沉稳男声",
+                "35岁左右男性，声音低沉沉稳，字正腔圆，从容大气，适合纪录片解说",
+            ),
+        ],
+    }
+}
+
+fn emotion_labels() -> Vec<String> {
+    let lang = get_language();
+    [
+        Emotion::Natural,
+        Emotion::Warm,
+        Emotion::Cheerful,
+        Emotion::Calm,
+        Emotion::Sad,
+        Emotion::Excited,
+        Emotion::Serious,
+    ]
+    .iter()
+    .map(|e| e.label(lang).to_string())
+    .collect()
+}
+
+fn pause_labels() -> Vec<String> {
+    let lang = get_language();
+    [PauseStyle::Natural, PauseStyle::More, PauseStyle::Less]
+        .iter()
+        .map(|p| p.label(lang).to_string())
+        .collect()
+}
+
+fn clone_model_labels() -> Vec<String> {
+    let lang = get_language();
+    [CloneModel::Base06B, CloneModel::Base17B]
+        .iter()
+        .map(|m| m.label(lang).to_string())
+        .collect()
+}
+
+fn source_labels() -> Vec<String> {
+    let lang = get_language();
+    [DownloadSource::Mirror, DownloadSource::Official]
+        .iter()
+        .map(|s| s.display_label(lang).to_string())
+        .collect()
+}
 
 pub struct VoxValeView {
     mode: TtsMode,
+    lang: Language,
     voice_desc: Entity<TextareaState>,
     text: Entity<TextareaState>,
     ref_path: Option<PathBuf>,
@@ -77,15 +140,16 @@ pub struct VoxValeView {
 
 impl VoxValeView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let lang = get_language();
         let voice_desc = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .rows(3)
-                .placeholder("描述想要的声音，或点击上方预设快速填充")
+                .placeholder(t("voice_desc_placeholder"))
         });
         let text = cx.new(|cx| {
             TextareaState::new(window, cx)
                 .rows(5)
-                .placeholder("输入要朗读的文本…")
+                .placeholder(t("text_placeholder"))
         });
 
         let speed = cx.new(|_| {
@@ -98,7 +162,7 @@ impl VoxValeView {
 
         let emotion = cx.new(|cx| {
             SelectState::new(
-                EMOTION_LABELS.iter().map(|s| s.to_string()).collect(),
+                emotion_labels(),
                 Some(IndexPath::default()),
                 window,
                 cx,
@@ -106,7 +170,7 @@ impl VoxValeView {
         });
         let pause = cx.new(|cx| {
             SelectState::new(
-                PAUSE_LABELS.iter().map(|s| s.to_string()).collect(),
+                pause_labels(),
                 Some(IndexPath::default()),
                 window,
                 cx,
@@ -120,17 +184,26 @@ impl VoxValeView {
                 cx,
             )
         });
+        let default_source = match lang {
+            Language::English => DownloadSource::Official,
+            Language::Chinese => DownloadSource::Mirror,
+        };
+        let source_items = source_labels();
+        let source_initial_row = source_items
+            .iter()
+            .position(|label| *label == default_source.display_label(lang))
+            .unwrap_or(0);
         let download_source = cx.new(|cx| {
             SelectState::new(
-                SOURCE_LABELS.iter().map(|s| s.to_string()).collect(),
-                Some(IndexPath::default()),
+                source_items,
+                Some(IndexPath::new(source_initial_row)),
                 window,
                 cx,
             )
         });
         let clone_model = cx.new(|cx| {
             SelectState::new(
-                CLONE_MODEL_LABELS.iter().map(|s| s.to_string()).collect(),
+                clone_model_labels(),
                 Some(IndexPath::default()),
                 window,
                 cx,
@@ -175,7 +248,7 @@ impl VoxValeView {
             |this, _, ev: &SelectEvent<Vec<String>>, _, cx| {
                 if let SelectEvent::Confirm(Some(v)) = ev {
                     this.download_source_val = v.clone();
-                    log::info!("下载源切换为 {}", this.download_source_val);
+                    log::info!("{}", t("log_source_switch"));
                     cx.notify();
                 }
             },
@@ -188,7 +261,7 @@ impl VoxValeView {
             |this, _, ev: &SelectEvent<Vec<String>>, _, cx| {
                 if let SelectEvent::Confirm(Some(v)) = ev {
                     this.clone_model_val = v.clone();
-                    log::info!("克隆模型切换为 {}", this.clone_model_val);
+                    log::info!("{}", t("log_clone_model_switch"));
                     cx.notify();
                 }
             },
@@ -211,12 +284,13 @@ impl VoxValeView {
         .detach();
 
         let player = AudioPreview::new().unwrap_or_else(|_| {
-            eprintln!("音频输出设备初始化失败，预览不可用");
+            eprintln!("{}", t("log_audio_init_failed"));
             AudioPreview::dummy()
         });
 
         Self {
             mode: TtsMode::Design,
+            lang,
             voice_desc,
             text,
             ref_path: None,
@@ -224,17 +298,20 @@ impl VoxValeView {
             speed,
             speed_val: 1.0,
             emotion,
-            emotion_val: EMOTION_LABELS[0].to_string(),
+            emotion_val: Emotion::Natural.label(lang).to_string(),
             pause,
-            pause_val: PAUSE_LABELS[0].to_string(),
+            pause_val: PauseStyle::Natural.label(lang).to_string(),
             language,
             language_val: LANGUAGES[0].to_string(),
             download_source,
-            download_source_val: SOURCE_LABELS[0].to_string(),
+            download_source_val: match lang {
+                Language::English => DownloadSource::Official.display_label(lang).to_string(),
+                Language::Chinese => DownloadSource::Mirror.display_label(lang).to_string(),
+            },
             clone_model,
-            clone_model_val: CLONE_MODEL_LABELS[0].to_string(),
+            clone_model_val: CloneModel::Base06B.label(lang).to_string(),
             busy: false,
-            status: "输入文本，点击「生成语音」开始".to_string(),
+            status: t("status_idle").to_string(),
             result: None,
             result_sr: 24000,
             result_text: String::new(),
@@ -259,26 +336,28 @@ impl VoxValeView {
                 } => {
                     self.busy = true;
                     self.status = if total_bytes > 0 {
-                        format!(
-                            "下载模型 {file_index}/{total_files} {file}：{} / {}（{:.0}%）",
-                            fmt_bytes(bytes),
-                            fmt_bytes(total_bytes),
-                            bytes as f64 / total_bytes as f64 * 100.0
-                        )
+                        t("downloading_model")
+                            .replace("{}", &file_index.to_string())
+                            .replace("{}", &total_files.to_string())
+                            .replace("{}", &file)
+                            .replace("{}", &fmt_bytes(bytes))
+                            .replace("{}", &fmt_bytes(total_bytes))
+                            .replace("{}", &format!("{:.0}", bytes as f64 / total_bytes as f64 * 100.0))
                     } else {
-                        format!(
-                            "下载模型 {file_index}/{total_files} {file}：{}",
-                            fmt_bytes(bytes)
-                        )
+                        t("downloading_model_no_total")
+                            .replace("{}", &file_index.to_string())
+                            .replace("{}", &total_files.to_string())
+                            .replace("{}", &file)
+                            .replace("{}", &fmt_bytes(bytes))
                     };
                 }
                 EngineEvent::ModelLoading { repo_id } => {
                     self.busy = true;
-                    self.status = format!("模型文件就绪，加载权重到内存（{repo_id}）…");
+                    self.status = t("model_loading").replace("{}", &repo_id);
                 }
                 EngineEvent::Generating => {
                     self.busy = true;
-                    self.status = "合成中…（本地推理，速度取决于机器性能）".to_string();
+                    self.status = t("status_generating").to_string();
                 }
                 EngineEvent::Done {
                     samples,
@@ -286,13 +365,13 @@ impl VoxValeView {
                 } => {
                     self.busy = false;
                     let secs = samples.len() as f32 / sample_rate as f32;
-                    self.status = format!("合成完成，时长 {secs:.1} 秒，可预览或导出 MP3");
+                    self.status = t("status_done").replace("{:.1}", &format!("{secs:.1}"));
                     self.result = Some(Arc::new(samples));
                     self.result_sr = sample_rate;
                 }
                 EngineEvent::Failed { message } => {
                     self.busy = false;
-                    self.status = format!("失败：{message}");
+                    self.status = t("status_failed").replace("{}", &message);
                 }
             }
         }
@@ -304,13 +383,13 @@ impl VoxValeView {
     fn start_generate(&mut self, cx: &mut Context<Self>) {
         let text = self.text.read(cx).value().trim().to_string();
         if text.is_empty() {
-            self.status = "请先输入朗读文本".to_string();
+            self.status = t("status_text_required").to_string();
             cx.notify();
             return;
         }
         self.result_text = text.clone();
         if self.mode == TtsMode::Clone && self.ref_path.is_none() {
-            self.status = "语音克隆需要先选择参考音频".to_string();
+            self.status = t("status_ref_required").to_string();
             cx.notify();
             return;
         }
@@ -327,11 +406,13 @@ impl VoxValeView {
                 };
                 let instruction = build_voice_instruction(&desc, &params);
                 log::info!(
-                    "提交合成[音色设计] 语速×{:.2} 情绪={} 停顿={} 语言={language} 下载源={}",
-                    params.speed,
-                    self.emotion_val,
-                    self.pause_val,
-                    source.label()
+                    "{}",
+                    t("log_synth_design")
+                        .replace("{:.2}", &format!("{:.2}", params.speed))
+                        .replace("{}", &self.emotion_val)
+                        .replace("{}", &self.pause_val)
+                        .replace("{}", &language)
+                        .replace("{}", &source.label(self.lang))
                 );
                 SynthRequest::Design {
                     text,
@@ -344,11 +425,13 @@ impl VoxValeView {
                 let path = self.ref_path.clone().unwrap();
                 let clone_model = CloneModel::from_label(&self.clone_model_val);
                 log::info!(
-                    "提交合成[语音克隆] 模型={} 语速×{:.2} 语言={language} 下载源={} 参考={}",
-                    clone_model.repo_id(),
-                    self.speed_val,
-                    source.label(),
-                    path.display()
+                    "{}",
+                    t("log_synth_clone")
+                        .replace("{}", &clone_model.repo_id())
+                        .replace("{:.2}", &format!("{:.2}", self.speed_val))
+                        .replace("{}", &language)
+                        .replace("{}", &source.label(self.lang))
+                        .replace("{}", &path.display().to_string())
                 );
                 match decode_audio_file(&path) {
                     Ok((pcm, sr)) => SynthRequest::Clone {
@@ -361,8 +444,14 @@ impl VoxValeView {
                         model: clone_model,
                     },
                     Err(e) => {
-                        log::error!("参考音频解码失败 {path:?}：{e:#}");
-                        self.status = format!("参考音频解码失败：{e:#}");
+                        log::error!(
+                            "{}",
+                            t("log_decode_failed")
+                                .replace("{:?}", &format!("{path:?}"))
+                                .replace("{:#}", &format!("{e:#}"))
+                        );
+                        self.status = t("status_decode_failed")
+                            .replace("{:#}", &format!("{e:#}"));
                         cx.notify();
                         return;
                     }
@@ -371,26 +460,35 @@ impl VoxValeView {
         };
 
         self.busy = true;
-        self.status = "已提交合成任务…".to_string();
+        self.status = t("status_submitted").to_string();
         if self.req_tx.send(req).is_err() {
             self.busy = false;
-            self.status = "合成线程已退出，请重启应用".to_string();
+            self.status = t("status_worker_dead").to_string();
         }
         cx.notify();
     }
 
     fn toggle_preview(&mut self, _cx: &mut Context<Self>) {
         if self.player.is_playing() {
-            log::info!("预览停止");
+            log::info!("{}", t("log_preview_stop"));
             self.player.stop();
             return;
         }
         if let Some(samples) = self.result.clone() {
             let sr = self.result_sr;
-            log::info!("开始预览播放：{} 样本 @{}Hz", samples.len(), sr);
+            log::info!(
+                "{}",
+                t("log_preview_play")
+                    .replace("{}", &samples.len().to_string())
+                    .replace("{}", &sr.to_string())
+            );
             if let Err(e) = self.player.play(samples, sr) {
-                log::error!("预览播放失败：{e:#}");
-                self.status = format!("预览失败：{e:#}");
+                log::error!(
+                    "{}",
+                    t("log_preview_failed").replace("{:#}", &format!("{e:#}"))
+                );
+                self.status = t("status_preview_failed")
+                    .replace("{:#}", &format!("{e:#}"));
             }
         }
     }
@@ -401,41 +499,52 @@ impl VoxValeView {
         };
         let default_name = mp3_default_name(&self.result_text);
         let Some(path) = rfd::FileDialog::new()
-            .add_filter("MP3 音频", &["mp3"])
+            .add_filter(t("mp3_audio"), &["mp3"])
             .set_file_name(&format!("{default_name}.mp3"))
             .save_file()
         else {
             return;
         };
         log::info!(
-            "导出 MP3 → {}（默认名 {default_name}.mp3，来自朗读文本前 20 字）",
-            path.display()
+            "{}",
+            t("log_export_mp3")
+                .replace("{}", &path.display().to_string())
+                .replace("{default_name}", &default_name)
         );
-        let t = Instant::now();
+        let start = Instant::now();
         match export_mp3(&samples, self.result_sr, &path) {
             Ok(()) => {
                 let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
                 log::info!(
-                    "导出完成 {}（{}），耗时 {:.1}s",
-                    path.display(),
-                    fmt_bytes(size),
-                    t.elapsed().as_secs_f32()
+                    "{}",
+                    t("log_export_done")
+                        .replace("{}", &path.display().to_string())
+                        .replace("{}", &fmt_bytes(size))
+                        .replace("{:.1}", &format!("{:.1}", start.elapsed().as_secs_f32()))
                 );
-                self.status = format!("已导出：{}", path.display());
+                self.status = t("status_exported")
+                    .replace("{}", &path.display().to_string());
             }
             Err(e) => {
-                log::error!("导出失败：{e:#}");
-                self.status = format!("导出失败：{e:#}");
+                log::error!(
+                    "{}",
+                    t("log_export_failed").replace("{:#}", &format!("{e:#}"))
+                );
+                self.status = t("status_export_failed")
+                    .replace("{:#}", &format!("{e:#}"));
             }
         }
     }
 
     fn pick_ref_audio(&mut self, _cx: &mut Context<Self>) {
         if let Some(path) = rfd::FileDialog::new()
-            .add_filter("音频文件", &["wav", "mp3", "flac", "ogg", "m4a"])
+            .add_filter(t("audio_files"), &["wav", "mp3", "flac", "ogg", "m4a"])
             .pick_file()
         {
-            log::info!("已选择参考音频：{}", path.display());
+            log::info!(
+                "{}",
+                t("log_ref_selected").replace("{}", &path.display().to_string())
+            );
             self.ref_name = path
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
@@ -457,7 +566,7 @@ impl VoxValeView {
                 div()
                     .text_size(px(12.0))
                     .font_weight(FontWeight::MEDIUM)
-                    .child(label.to_string()),
+                    .child(t(label)),
             )
     }
 
@@ -470,17 +579,66 @@ impl VoxValeView {
                 div()
                     .text_size(px(11.0))
                     .text_color(cx.theme().muted_foreground)
-                    .child(label.to_string()),
+                    .child(t(label)),
             )
             .child(el)
+    }
+
+    fn refresh_select(
+        entity: &Entity<SelectState<Vec<String>>>,
+        items: Vec<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let ix = entity.read(cx).selected_index(cx);
+        entity.update(cx, |state, cx| {
+            state.set_items(items, window, cx);
+            state.set_selected_index(ix, window, cx);
+        });
+    }
+
+    fn switch_language(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let new_lang = self.lang.toggle();
+        set_language(new_lang);
+        self.lang = new_lang;
+
+        self.emotion_val = Emotion::from_label(&self.emotion_val)
+            .label(new_lang)
+            .to_string();
+        self.pause_val = PauseStyle::from_label(&self.pause_val)
+            .label(new_lang)
+            .to_string();
+        self.clone_model_val = CloneModel::from_label(&self.clone_model_val)
+            .label(new_lang)
+            .to_string();
+        self.download_source_val = DownloadSource::from_label(&self.download_source_val)
+            .display_label(new_lang)
+            .to_string();
+        self.status = t("status_idle").to_string();
+
+        Self::refresh_select(&self.emotion, emotion_labels(), window, cx);
+        Self::refresh_select(&self.pause, pause_labels(), window, cx);
+        Self::refresh_select(&self.clone_model, clone_model_labels(), window, cx);
+        Self::refresh_select(&self.download_source, source_labels(), window, cx);
+
+        self.voice_desc.update(cx, |state, cx| {
+            state.set_placeholder(t("voice_desc_placeholder"), window, cx);
+        });
+        self.text.update(cx, |state, cx| {
+            state.set_placeholder(t("text_placeholder"), window, cx);
+        });
+
+        window.set_window_title(t("window_title"));
+        log::info!("language switched to {:?}", new_lang);
+        cx.notify();
     }
 
     fn status_badge(&self, cx: &Context<Self>) -> Div {
         let (icon, color) = if self.busy {
             (None, cx.theme().muted_foreground)
-        } else if self.status.starts_with("失败") {
+        } else if self.status.starts_with("失败") || self.status.starts_with("Failed") {
             (Some(IconName::CircleX), cx.theme().danger)
-        } else if self.status.starts_with("合成完成") || self.status.starts_with("已导出") {
+        } else if self.status.starts_with("合成完成") || self.status.starts_with("Synthesis complete") || self.status.starts_with("已导出") || self.status.starts_with("Exported") {
             (Some(IconName::CircleCheck), cx.theme().success)
         } else {
             (Some(IconName::Info), cx.theme().muted_foreground)
@@ -534,9 +692,9 @@ impl Render for VoxValeView {
                             div()
                                 .text_size(px(13.0))
                                 .font_weight(FontWeight::SEMIBOLD)
-                                .child("声谷 VoxVale"),
+                                .child(t("app_name")),
                         )
-                        .child(div().text_size(px(11.0)).text_color(muted).child("v0.1.0")),
+                        .child(div().text_size(px(11.0)).text_color(muted).child(t("app_version"))),
                 ),
             )
             .child(
@@ -555,27 +713,37 @@ impl Render for VoxValeView {
                             .child(
                                 Button::new("mode-design")
                                     .icon(Icon::new(IconName::Plus))
-                                    .label("音色设计")
+                                    .label(t("mode_design"))
                                     .when(design_mode, |b| b.primary())
                                     .flex_1()
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        log::info!("切换到音色设计模式");
+                                        log::info!("{}", t("log_mode_design"));
                                         this.mode = TtsMode::Design;
-                                        this.status = "已切换到音色设计模式".to_string();
+                                        this.status = t("status_design_mode").to_string();
                                         cx.notify();
                                     })),
                             )
                             .child(
                                 Button::new("mode-clone")
                                     .icon(Icon::new(IconName::Copy))
-                                    .label("语音克隆")
+                                    .label(t("mode_clone"))
                                     .when(!design_mode, |b| b.primary())
                                     .flex_1()
                                     .on_click(cx.listener(|this, _, _, cx| {
-                                        log::info!("切换到语音克隆模式");
+                                        log::info!("{}", t("log_mode_clone"));
                                         this.mode = TtsMode::Clone;
-                                        this.status = "已切换到语音克隆模式".to_string();
+                                        this.status = t("status_clone_mode").to_string();
                                         cx.notify();
+                                    })),
+                            )
+                            .child(
+                                Button::new("lang-toggle")
+                                    .icon(Icon::new(IconName::Globe))
+                                    .label(self.lang.label())
+                                    .small()
+                                    .ghost()
+                                    .on_click(cx.listener(|this, _, window, cx| {
+                                        this.switch_language(window, cx);
                                     })),
                             ),
                     )
@@ -588,7 +756,7 @@ impl Render for VoxValeView {
                                         .items_center()
                                         .justify_between()
                                         .child(
-                                            self.section_label(cx, IconName::User, "音色描述"),
+                                            self.section_label(cx, IconName::User, "voice_description"),
                                         )
                                         .child(
                                             h_flex()
@@ -598,10 +766,12 @@ impl Render for VoxValeView {
                                                     div()
                                                         .text_size(px(11.0))
                                                         .text_color(muted)
-                                                        .child("快速预设："),
+                                                        .child(t("quick_presets")),
                                                 )
-                                                .children(
-                                                    VOICE_PRESETS.iter().enumerate().map(
+                                                .children({
+                                                    let presets: &'static [(&'static str, &'static str)] =
+                                                        Box::leak(voice_presets().to_vec().into_boxed_slice());
+                                                    presets.iter().enumerate().map(
                                                         |(i, (name, _))| {
                                                             Button::new(("preset", i))
                                                                 .label(*name)
@@ -610,9 +780,11 @@ impl Render for VoxValeView {
                                                                 .on_click(cx.listener(
                                                                     move |this, _, window, cx| {
                                                                         let text =
-                                                                            VOICE_PRESETS[i].1;
+                                                                            voice_presets()[i].1;
                                                                         log::info!(
-                                                                            "应用音色预设：{name}"
+                                                                            "{}",
+                                                                            t("log_preset_applied")
+                                                                                .replace("{}", name)
                                                                         );
                                                                         this.voice_desc.update(
                                                                             cx,
@@ -628,8 +800,8 @@ impl Render for VoxValeView {
                                                                     },
                                                                 ))
                                                         },
-                                                    ),
-                                                ),
+                                                    ).collect::<Vec<_>>()
+                                                }),
                                         ),
                                 )
                                 .child(div().w_full().child(Textarea::new(&self.voice_desc))),
@@ -638,7 +810,7 @@ impl Render for VoxValeView {
                     .when(!design_mode, |d| {
                         d.child(
                             GroupBox::new()
-                                .title(self.section_label(cx, IconName::Copy, "参考音频"))
+                                .title(self.section_label(cx, IconName::Copy, "reference_audio"))
                                 .child(
                                     h_flex()
                                         .gap_2()
@@ -646,7 +818,7 @@ impl Render for VoxValeView {
                                         .child(
                                             Button::new("pick-ref")
                                                 .icon(Icon::new(IconName::FolderOpen))
-                                                .label("选择文件")
+                                                .label(t("choose_file"))
                                                 .secondary()
                                                 .on_click(cx.listener(|this, _, _, cx| {
                                                     this.pick_ref_audio(cx);
@@ -658,8 +830,7 @@ impl Render for VoxValeView {
                                                 .text_color(muted)
                                                 .truncate()
                                                 .child(if self.ref_name.is_empty() {
-                                                    "未选择（支持 wav / mp3 / flac / ogg）"
-                                                        .to_string()
+                                                    t("no_file_selected").to_string()
                                                 } else {
                                                     self.ref_name.clone()
                                                 }),
@@ -668,7 +839,7 @@ impl Render for VoxValeView {
                                 .child(
                                     self.field(
                                         cx,
-                                        "克隆模型",
+                                        "clone_model",
                                         div()
                                             .w_full()
                                             .max_w(px(280.0))
@@ -685,13 +856,13 @@ impl Render for VoxValeView {
                                     .items_center()
                                     .justify_between()
                                     .child(
-                                        self.section_label(cx, IconName::BookOpen, "朗读文本"),
+                                        self.section_label(cx, IconName::BookOpen, "narration_text"),
                                     )
                                     .child(
                                         div()
                                             .text_size(px(11.0))
                                             .text_color(muted)
-                                            .child(format!("{text_chars} 字")),
+                                            .child(format!("{} {}", text_chars, t("char_count"))),
                                     ),
                             )
                             .child(div().w_full().child(Textarea::new(&self.text))),
@@ -699,7 +870,7 @@ impl Render for VoxValeView {
                     .child(
                         GroupBox::new()
                             .title(
-                                self.section_label(cx, IconName::Settings2, "参数"),
+                                self.section_label(cx, IconName::Settings2, "parameters"),
                             )
                             .child(
                                 h_flex()
@@ -708,7 +879,7 @@ impl Render for VoxValeView {
                                     .child(
                                         self.field(
                                             cx,
-                                            "语速",
+                                            "speed",
                                             h_flex()
                                                 .w_full()
                                                 .items_center()
@@ -732,7 +903,7 @@ impl Render for VoxValeView {
                                     .child(dim(
                                         self.field(
                                             cx,
-                                            "情绪",
+                                            "emotion",
                                             div().w_full().child(Select::new(&self.emotion)),
                                         ),
                                         design_mode,
@@ -745,19 +916,19 @@ impl Render for VoxValeView {
                                     .child(dim(
                                         self.field(
                                             cx,
-                                            "停顿",
+                                            "pause",
                                             div().w_full().child(Select::new(&self.pause)),
                                         ),
                                         design_mode,
                                     ))
                                     .child(self.field(
                                         cx,
-                                        "语言",
+                                        "language",
                                         div().w_full().child(Select::new(&self.language)),
                                     ))
                                     .child(self.field(
                                         cx,
-                                        "下载源",
+                                        "download_source",
                                         div().w_full().child(Select::new(&self.download_source)),
                                     )),
                             ),
@@ -768,7 +939,7 @@ impl Render for VoxValeView {
                             .child(
                                 Button::new("generate")
                                     .when(busy, |b| b.icon(Spinner::new()))
-                                    .label(if busy { "合成中…" } else { "生成语音" })
+                                    .label(if busy { t("generating") } else { t("generate") })
                                     .primary()
                                     .disabled(busy)
                                     .on_click(cx.listener(|this, _, _, cx| {
@@ -782,7 +953,7 @@ impl Render for VoxValeView {
                                     } else {
                                         IconName::Play
                                     }))
-                                    .label(if playing { "停止" } else { "预览" })
+                                    .label(if playing { t("stop") } else { t("preview") })
                                     .secondary()
                                     .disabled(busy || !has_result)
                                     .on_click(cx.listener(|this, _, _, cx| {
@@ -792,7 +963,7 @@ impl Render for VoxValeView {
                             .child(
                                 Button::new("export")
                                     .icon(Icon::new(IconName::File))
-                                    .label("导出 MP3")
+                                    .label(t("export_mp3"))
                                     .secondary()
                                     .disabled(busy || !has_result)
                                     .on_click(cx.listener(|this, _, _, cx| {
@@ -814,11 +985,11 @@ impl Render for VoxValeView {
                         h_flex()
                             .gap_1p5()
                             .items_center()
-                                                        .child(
+                            .child(
                                 div()
                                     .text_size(px(11.0))
                                     .text_color(muted)
-                                    .child("本地推理 · 数据不出设备"),
+                                    .child(t("local_inference")),
                             ),
                     ),
             )

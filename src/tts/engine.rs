@@ -10,12 +10,11 @@ use std::time::{Duration, Instant};
 
 use crate::audio::decode::{TARGET_SAMPLE_RATE, resample_linear};
 use crate::audio::stretch::time_stretch;
+use crate::i18n::Language;
 
 pub const DESIGN_MODEL_ID: &str = "Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign";
 pub const CLONE_MODEL_06B: &str = "Qwen/Qwen3-TTS-12Hz-0.6B-Base";
 pub const CLONE_MODEL_17B: &str = "Qwen/Qwen3-TTS-12Hz-1.7B-Base";
-
-pub const CLONE_MODEL_LABELS: [&str; 2] = ["0.6B（更快，推荐 CPU）", "1.7B（更高质量）"];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum CloneModel {
@@ -24,6 +23,19 @@ pub enum CloneModel {
 }
 
 impl CloneModel {
+    pub fn label(&self, lang: Language) -> &'static str {
+        match lang {
+            Language::English => match self {
+                Self::Base06B => "0.6B (faster, CPU recommended)",
+                Self::Base17B => "1.7B (higher quality)",
+            },
+            Language::Chinese => match self {
+                Self::Base06B => "0.6B（更快，推荐 CPU）",
+                Self::Base17B => "1.7B（更高质量）",
+            },
+        }
+    }
+
     pub fn from_label(label: &str) -> Self {
         if label.starts_with("1.7B") {
             Self::Base17B
@@ -39,8 +51,6 @@ impl CloneModel {
         }
     }
 }
-
-pub const SOURCE_LABELS: [&str; 2] = ["hf-mirror.com（国内镜像）", "huggingface.co（官方）"];
 
 const PROGRESS_CHUNK: u64 = 1024 * 1024;
 const READ_BUF: usize = 256 * 1024;
@@ -73,10 +83,29 @@ impl DownloadSource {
         }
     }
 
-    pub fn label(&self) -> &'static str {
-        match self {
-            Self::Mirror => "hf-mirror.com",
-            Self::Official => "huggingface.co",
+    pub fn label(&self, lang: Language) -> &'static str {
+        match lang {
+            Language::English => match self {
+                Self::Mirror => "hf-mirror.com",
+                Self::Official => "huggingface.co",
+            },
+            Language::Chinese => match self {
+                Self::Mirror => "hf-mirror.com",
+                Self::Official => "huggingface.co",
+            },
+        }
+    }
+
+    pub fn display_label(&self, lang: Language) -> &'static str {
+        match lang {
+            Language::English => match self {
+                Self::Mirror => "hf-mirror.com (China mirror)",
+                Self::Official => "huggingface.co (official)",
+            },
+            Language::Chinese => match self {
+                Self::Mirror => "hf-mirror.com（国内镜像）",
+                Self::Official => "huggingface.co（官方）",
+            },
         }
     }
 }
@@ -182,7 +211,7 @@ impl TtsEngine {
                 log::info!(
                     "合成任务[音色设计] 语言={language} 文本{}字 指令={instruction:?} 下载源={}",
                     text.chars().count(),
-                    source.label()
+                    source.label(crate::i18n::get_language())
                 );
                 let t_total = Instant::now();
                 let model = self.ensure_model(DESIGN_MODEL_ID, source, events)?;
@@ -222,7 +251,7 @@ impl TtsEngine {
                     model.repo_id(),
                     text.chars().count(),
                     ref_pcm.len(),
-                    source.label()
+                    source.label(crate::i18n::get_language())
                 );
                 let t_total = Instant::now();
                 let pcm24 = resample_linear(&ref_pcm, ref_sample_rate, TARGET_SAMPLE_RATE);
@@ -358,7 +387,7 @@ fn download_model(
     let root = model_cache_root()?.join(repo_id);
     let t0 = Instant::now();
 
-    log::info!("准备下载模型 {repo_id}，来源={}，缓存目录={}", source.label(), root.display());
+    log::info!("准备下载模型 {repo_id}，来源={}，缓存目录={}", source.label(crate::i18n::get_language()), root.display());
 
     let file_sizes = repo_file_sizes(&agent, endpoint, repo_id).with_context(|| {
         format!(
