@@ -248,7 +248,7 @@ impl VoxValeView {
             |this, _, ev: &SelectEvent<Vec<String>>, _, cx| {
                 if let SelectEvent::Confirm(Some(v)) = ev {
                     this.download_source_val = v.clone();
-                    log::info!("{}", t("log_source_switch"));
+                    log::info!("{}", t("log_source_switch").replace("{}", &v));
                     cx.notify();
                 }
             },
@@ -261,7 +261,7 @@ impl VoxValeView {
             |this, _, ev: &SelectEvent<Vec<String>>, _, cx| {
                 if let SelectEvent::Confirm(Some(v)) = ev {
                     this.clone_model_val = v.clone();
-                    log::info!("{}", t("log_clone_model_switch"));
+                    log::info!("{}", t("log_clone_model_switch").replace("{}", &v));
                     cx.notify();
                 }
             },
