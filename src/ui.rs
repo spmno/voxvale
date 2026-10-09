@@ -337,18 +337,18 @@ impl VoxValeView {
                     self.busy = true;
                     self.status = if total_bytes > 0 {
                         t("downloading_model")
-                            .replace("{}", &file_index.to_string())
-                            .replace("{}", &total_files.to_string())
-                            .replace("{}", &file)
-                            .replace("{}", &fmt_bytes(bytes))
-                            .replace("{}", &fmt_bytes(total_bytes))
-                            .replace("{}", &format!("{:.0}", bytes as f64 / total_bytes as f64 * 100.0))
+                            .replacen("{}", &file_index.to_string(), 1)
+                            .replacen("{}", &total_files.to_string(), 1)
+                            .replacen("{}", &file, 1)
+                            .replacen("{}", &fmt_bytes(bytes), 1)
+                            .replacen("{}", &fmt_bytes(total_bytes), 1)
+                            .replace("{:.0}", &format!("{:.0}", bytes as f64 / total_bytes as f64 * 100.0))
                     } else {
                         t("downloading_model_no_total")
-                            .replace("{}", &file_index.to_string())
-                            .replace("{}", &total_files.to_string())
-                            .replace("{}", &file)
-                            .replace("{}", &fmt_bytes(bytes))
+                            .replacen("{}", &file_index.to_string(), 1)
+                            .replacen("{}", &total_files.to_string(), 1)
+                            .replacen("{}", &file, 1)
+                            .replacen("{}", &fmt_bytes(bytes), 1)
                     };
                 }
                 EngineEvent::ModelLoading { repo_id } => {
@@ -409,10 +409,10 @@ impl VoxValeView {
                     "{}",
                     t("log_synth_design")
                         .replace("{:.2}", &format!("{:.2}", params.speed))
-                        .replace("{}", &self.emotion_val)
-                        .replace("{}", &self.pause_val)
-                        .replace("{}", &language)
-                        .replace("{}", &source.label(self.lang))
+                        .replacen("{}", &self.emotion_val, 1)
+                        .replacen("{}", &self.pause_val, 1)
+                        .replacen("{}", &language, 1)
+                        .replacen("{}", &source.label(self.lang), 1)
                 );
                 SynthRequest::Design {
                     text,
@@ -427,11 +427,11 @@ impl VoxValeView {
                 log::info!(
                     "{}",
                     t("log_synth_clone")
-                        .replace("{}", &clone_model.repo_id())
+                        .replacen("{}", &clone_model.repo_id(), 1)
                         .replace("{:.2}", &format!("{:.2}", self.speed_val))
-                        .replace("{}", &language)
-                        .replace("{}", &source.label(self.lang))
-                        .replace("{}", &path.display().to_string())
+                        .replacen("{}", &language, 1)
+                        .replacen("{}", &source.label(self.lang), 1)
+                        .replacen("{}", &path.display().to_string(), 1)
                 );
                 match decode_audio_file(&path) {
                     Ok((pcm, sr)) => SynthRequest::Clone {
@@ -479,8 +479,8 @@ impl VoxValeView {
             log::info!(
                 "{}",
                 t("log_preview_play")
-                    .replace("{}", &samples.len().to_string())
-                    .replace("{}", &sr.to_string())
+                    .replacen("{}", &samples.len().to_string(), 1)
+                    .replacen("{}", &sr.to_string(), 1)
             );
             if let Err(e) = self.player.play(samples, sr) {
                 log::error!(
@@ -518,8 +518,8 @@ impl VoxValeView {
                 log::info!(
                     "{}",
                     t("log_export_done")
-                        .replace("{}", &path.display().to_string())
-                        .replace("{}", &fmt_bytes(size))
+                        .replacen("{}", &path.display().to_string(), 1)
+                        .replacen("{}", &fmt_bytes(size), 1)
                         .replace("{:.1}", &format!("{:.1}", start.elapsed().as_secs_f32()))
                 );
                 self.status = t("status_exported")
