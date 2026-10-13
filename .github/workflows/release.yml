@@ -1,0 +1,99 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            features: ""
+          - name: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            features: "--features metal"
+          - name: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            features: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libasound2-dev pkg-config \
+            libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-xkb-dev
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --locked --target ${{ matrix.target }} ${{ matrix.features }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p dist/voxvale-${{ matrix.name }}
+          cp target/${{ matrix.target }}/release/voxvale dist/voxvale-${{ matrix.name }}/
+          cp README.md README.zh-CN.md LICENSE-MIT LICENSE-APACHE dist/voxvale-${{ matrix.name }}/
+          cd dist && tar -czf voxvale-${{ matrix.name }}.tar.gz voxvale-${{ matrix.name }}
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/voxvale-${{ matrix.name }} | Out-Null
+          Copy-Item target/${{ matrix.target }}/release/voxvale.exe dist/voxvale-${{ matrix.name }}/
+          Copy-Item README.md, README.zh-CN.md, LICENSE-MIT, LICENSE-APACHE dist/voxvale-${{ matrix.name }}/
+          Compress-Archive -Path dist/voxvale-${{ matrix.name }} -DestinationPath dist/voxvale-${{ matrix.name }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxvale-${{ matrix.name }}
+          path: dist/voxvale-${{ matrix.name }}.*
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: voxvale-*
+          path: dist
+          merge-multiple: true
+
+      - name: Create release and upload assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -la dist
+          gh release create "${{ github.ref_name }}" dist/* \
+            --title "VoxVale ${{ github.ref_name }}" \
+            --generate-notes
