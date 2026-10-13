@@ -12,7 +12,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     - name: Install system libs
-      run: sudo apt update && sudo apt install -y pkg-config libfontconfig-dev libasound2-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-xkb-dev
+      run: sudo apt update && sudo apt install -y pkg-config libfontconfig-dev libfreetype-dev libasound2-dev libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-xkb-dev
     - name: Build
       run: cargo build --verbose
     - name: Run tests
