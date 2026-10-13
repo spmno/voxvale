@@ -2,6 +2,9 @@
 
 > [English](README.md) | **简体中文**
 
+[![Release](https://img.shields.io/github/v/release/spmno/voxvale)](https://github.com/spmno/voxvale/releases)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#许可证)
+
 本地优先的语音生成桌面应用 —— 描述声音、输入文本、导出 MP3。
 
 基于 GPUI + Candle 构建，Qwen3-TTS 模型**全程在本机推理，数据不出设备**。
@@ -27,6 +30,10 @@
 | AMD Radeon Pro W7900 via ZLUDA（实验性） | ≈ 2.7x |
 
 \* RTF = 合成耗时 / 音频时长，越小越快。1 分钟音频在 CPU 上约需 4.4 分钟合成；GPU 加速收益取决于负载形态（详见「已知限制」）。
+
+## ⬇️ 下载
+
+Windows、macOS（Apple Silicon，Metal 加速）、Linux 预编译版本见 [Releases](https://github.com/spmno/voxvale/releases) 页面，下载即用，无需安装 Rust。
 
 ## 🛠 构建要求
 
@@ -80,3 +87,7 @@ RUST_LOG=voxvale=debug ./target/release/voxvale
 
 - [Qwen3-TTS](https://huggingface.co/Qwen3-TTS)（阿里通义）· [Candle](https://github.com/huggingface/candle) · [qwen_tts](https://github.com/danielclough/qwen3-tts-rs)
 - [gpui-component](https://github.com/longbridge/gpui-component)（GPUI Kit）· [ZLUDA](https://github.com/vosen/ZLUDA) · [Shine](https://github.com/toots/shine) · [Lucide](https://lucide.dev) 图标
+
+## 许可证
+
+在 [MIT](LICENSE-MIT) 或 [Apache-2.0](LICENSE-APACHE) 之间任选其一。

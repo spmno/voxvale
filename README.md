@@ -2,6 +2,9 @@
 
 > **English** | [简体中文](README.zh-CN.md)
 
+[![Release](https://img.shields.io/github/v/release/spmno/voxvale)](https://github.com/spmno/voxvale/releases)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
+
 Local-first voice generation desktop app — describe a voice, input text, export MP3.
 
 Built on GPUI + Candle. Qwen3-TTS model runs **entirely on-device — your data never leaves your machine**.
@@ -27,6 +30,10 @@ All inference runs locally. The app makes no network requests except for the ini
 | AMD Radeon Pro W7900 via ZLUDA (experimental) | ~2.7x |
 
 \* RTF = synthesis time / audio duration; lower is faster. 1 minute of audio takes ~4.4 minutes to synthesize on CPU; GPU acceleration gains depend on workload characteristics (see "Known Limitations").
+
+## Download
+
+Prebuilt binaries for Windows, macOS (Apple Silicon, Metal-accelerated), and Linux are available on the [Releases](https://github.com/spmno/voxvale/releases) page.
 
 ## Build Requirements
 
@@ -80,3 +87,7 @@ Logs cover: mode switching, task submission parameters, model download progress,
 
 - [Qwen3-TTS](https://huggingface.co/Qwen3-TTS) (Alibaba Tongyi) · [Candle](https://github.com/huggingface/candle) · [qwen_tts](https://github.com/danielclough/qwen3-tts-rs)
 - [gpui-component](https://github.com/longbridge/gpui-component) (GPUI Kit) · [ZLUDA](https://github.com/vosen/ZLUDA) · [Shine](https://github.com/toots/shine) · [Lucide](https://lucide.dev) icons
+
+## License
+
+Licensed under either of [MIT](LICENSE-MIT) or [Apache-2.0](LICENSE-APACHE) at your option.
