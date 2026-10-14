@@ -26,6 +26,7 @@ All inference runs locally. The app makes no network requests except for the ini
 
 | Environment | RTF* |
 |---|---|
+| NVIDIA RTX 3050 (CUDA, adaptive BF16) | ~1.4x |
 | AMD Ryzen 9 9950X (CPU, release build) | ~4.4x |
 | AMD Radeon Pro W7900 via ZLUDA (experimental) | ~2.7x |
 
@@ -57,7 +58,7 @@ On first use: click "Generate Speech" and the app will auto-download the model f
 | Platform | Command | Notes |
 |---|---|---|
 | macOS Apple Silicon | `cargo build --release --features metal` | Native Metal, recommended |
-| Windows / Linux + NVIDIA | `cargo build --release --features cuda` | Native CUDA, recommended |
+| Windows / Linux + NVIDIA | `cargo build --release --features cuda` | Native CUDA, recommended; on Linux grab the prebuilt cuda package from Releases (requires NVIDIA driver + CUDA 12 runtime) |
 | Linux + AMD (experimental) | `source scripts/env-cuda.sh` then same as above; at runtime set `LD_LIBRARY_PATH=$HOME/zluda/zluda:$HOME/cuda-12.6/lib64:/opt/rocm/lib` | ZLUDA compatibility layer; script includes full environment setup instructions |
 
 > Note: A Candle ROCm community fork also exists for Linux + AMD (PR #3424); switch once its convolution kernels mature.

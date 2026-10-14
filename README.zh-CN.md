@@ -26,6 +26,7 @@
 
 | 环境 | RTF* |
 |---|---|
+| NVIDIA RTX 3050（CUDA，BF16 自适应） | ≈ 1.4x |
 | AMD Ryzen 9 9950X（CPU，release 构建） | ≈ 4.4x |
 | AMD Radeon Pro W7900 via ZLUDA（实验性） | ≈ 2.7x |
 
@@ -57,7 +58,7 @@ cargo build --release
 | 平台 | 命令 | 说明 |
 |---|---|---|
 | macOS Apple Silicon | `cargo build --release --features metal` | 原生 Metal，推荐 |
-| Windows / Linux + NVIDIA | `cargo build --release --features cuda` | 原生 CUDA，推荐 |
+| Windows / Linux + NVIDIA | `cargo build --release --features cuda` | 原生 CUDA，推荐；Linux 可直接下载 Releases 的 cuda 预编译包（需 NVIDIA 驱动及 CUDA 12 运行库） |
 | Linux + AMD（实验性） | `source scripts/env-cuda.sh` 后同上，运行时 `LD_LIBRARY_PATH=$HOME/zluda/zluda:$HOME/cuda-12.6/lib64:/opt/rocm/lib` | ZLUDA 兼容层，脚本含完整环境搭建说明 |
 
 > 注：Linux + AMD 也存在 Candle ROCm 社区分支方案（PR #3424），待其卷积内核成熟后可切换。
