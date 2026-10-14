@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
-use candle_core::{Device, Tensor};
-use qwen_tts::model::loader::{LoaderConfig, ModelLoader};
+use candle_core::{DType, Device, Tensor};
 use qwen_tts::model::Model;
+use qwen_tts::model::loader::{LoaderConfig, ModelLoader};
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -171,7 +171,13 @@ impl TtsEngine {
         let dir = match self.dirs.get(repo_id) {
             Some(d) => d.clone(),
             None => {
-                let d = download_model(repo_id, source, events)?;
+                let root = model_cache_root()?.join(repo_id);
+                let d = if model_cache_complete(&root) {
+                    log::info!("模型 {repo_id} 本地缓存完整，跳过联网检查");
+                    root
+                } else {
+                    download_model(repo_id, source, events)?
+                };
                 self.dirs.insert(repo_id, d.clone());
                 d
             }
@@ -185,11 +191,36 @@ impl TtsEngine {
 
         let loader = ModelLoader::from_local_dir(&dir)
             .with_context(|| format!("读取模型目录失败: {}", dir.display()))?;
-        let model = loader
-            .load_tts_model(&self.device, &LoaderConfig::default())
-            .context("加载 TTS 模型失败")?;
+        let gpu = self.device.is_cuda() || self.device.is_metal();
+        let dtype = pick_dtype(&self.device, &dir);
+        let (model, dtype) = match loader.load_tts_model(
+            &self.device,
+            &LoaderConfig {
+                dtype,
+                ..Default::default()
+            },
+        ) {
+            Ok(m) => (m, dtype),
+            Err(e) if gpu && dtype == DType::F32 && format!("{e:?}").contains("OUT_OF_MEMORY") => {
+                log::warn!("F32 加载显存不足，降级 BF16 重试");
+                let m = loader
+                    .load_tts_model(
+                        &self.device,
+                        &LoaderConfig {
+                            dtype: DType::BF16,
+                            ..Default::default()
+                        },
+                    )
+                    .context("加载 TTS 模型失败")?;
+                (m, DType::BF16)
+            }
+            Err(e) => return Err(e).context("加载 TTS 模型失败"),
+        };
 
-        log::info!("模型 {repo_id} 加载完成，耗时 {:.1}s", t.elapsed().as_secs_f32());
+        log::info!(
+            "模型 {repo_id} 加载完成（{dtype:?}），耗时 {:.1}s",
+            t.elapsed().as_secs_f32()
+        );
         self.models.insert(repo_id, model);
         Ok(self.models.get_mut(repo_id).unwrap())
     }
@@ -296,7 +327,10 @@ fn finish(result: qwen_tts::model::types::GenerationResult) -> Result<(Vec<f32>,
     } else {
         result.audio
     };
-    let samples = audio.to_vec1::<f32>().context("音频张量转换失败")?;
+    let samples = audio
+        .to_dtype(DType::F32)?
+        .to_vec1::<f32>()
+        .context("音频张量转换失败")?;
     if samples.is_empty() {
         bail!("模型未生成任何音频");
     }
@@ -375,6 +409,78 @@ struct PlannedFile {
     remote: String,
     required: bool,
     size: Option<u64>,
+}
+
+/// 本地缓存完整（必需文件齐全且无 .part 残留）时跳过联网检查，支持完全离线启动
+fn model_cache_complete(root: &Path) -> bool {
+    let weights = root.join("model.safetensors").is_file()
+        || root.join("model.safetensors.index.json").is_file();
+    let complete = root.join("config.json").is_file()
+        && weights
+        && root.join("speech_tokenizer/config.json").is_file()
+        && root.join("speech_tokenizer/model.safetensors").is_file();
+    if !complete {
+        return false;
+    }
+    !root
+        .read_dir()
+        .map(|mut it| {
+            it.any(|e| e.is_ok_and(|e| e.file_name().to_string_lossy().ends_with(".part")))
+        })
+        .unwrap_or(false)
+}
+
+#[cfg(feature = "cuda")]
+fn cuda_free_memory() -> Option<usize> {
+    cudarc::runtime::result::get_mem_info()
+        .ok()
+        .map(|(free, _)| free)
+}
+
+fn dir_size_bytes(dir: &Path) -> u64 {
+    fn walk(p: &Path, acc: &mut u64) {
+        if let Ok(rd) = std::fs::read_dir(p) {
+            for e in rd.flatten() {
+                let path = e.path();
+                if path.is_dir() {
+                    walk(&path, acc);
+                } else if let Ok(m) = e.metadata() {
+                    *acc += m.len();
+                }
+            }
+        }
+    }
+    let mut acc = 0;
+    walk(dir, &mut acc);
+    acc
+}
+
+/// CUDA 按空闲显存选精度：F32 权重约为权重文件两倍，加 1GiB 推理余量；其他设备默认 F32
+fn pick_dtype(device: &Device, dir: &Path) -> DType {
+    #[cfg(feature = "cuda")]
+    if device.is_cuda() {
+        match cuda_free_memory() {
+            Some(free) => {
+                let weights = dir_size_bytes(dir);
+                let need_f32 = weights.saturating_mul(2).saturating_add(1 << 30);
+                let dtype = if free as u64 >= need_f32 {
+                    DType::F32
+                } else {
+                    DType::BF16
+                };
+                log::info!(
+                    "显存空闲 {}，权重文件 {}（F32 需 {}），选用 {dtype:?}",
+                    fmt_bytes(free as u64),
+                    fmt_bytes(weights),
+                    fmt_bytes(need_f32)
+                );
+                return dtype;
+            }
+            None => log::warn!("显存查询失败，按 F32 优先加载"),
+        }
+    }
+    let _ = (device, dir);
+    DType::F32
 }
 
 fn download_model(
