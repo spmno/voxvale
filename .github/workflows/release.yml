@@ -31,6 +31,11 @@ jobs:
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             features: ""
+          - name: linux-x86_64-cuda
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            features: "--features cuda"
+            cuda: true
     steps:
       - uses: actions/checkout@v4
 
@@ -42,6 +47,12 @@ jobs:
             libasound2-dev pkg-config libfontconfig-dev libfreetype-dev \
             libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb-xkb-dev
 
+      - name: Install CUDA toolkit (Linux CUDA build)
+        if: matrix.cuda == true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends nvidia-cuda-toolkit
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -49,6 +60,8 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.name }}
 
       - name: Build
         run: cargo build --release --locked --target ${{ matrix.target }} ${{ matrix.features }}
